@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Riverbank Bio-Engineering Magazine & BOQ Engine (Beta 0.4)</title>
+  <style>
+    :root {
+      --primary: #1b4332;
+      --accent: #2d6a4f;
+      --accent-light: #52b788;
+      --sand: #d8f3dc;
+      --bg: #0d131a;
+      --panel: #161f28;
+      --text: #e9ecef;
+      --text-muted: #8a99a8;
+      --hazard: #e63946;
+      --gold: #ffb703;
+      --touch-size: 48px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 80px; }
+
+    header { background: var(--panel); border-bottom: 2px solid var(--accent); padding: 12px 16px; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+    .badge { background: var(--accent); color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; letter-spacing: 0.5px; }
+
+    .controls { background: var(--panel); padding: 14px 16px; margin: 12px auto; max-width: 960px; border-radius: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+    .control-group label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+    .control-group input { width: 100%; height: var(--touch-size); background: #090d12; border: 1px solid #2a3b4c; border-radius: 6px; color: #fff; font-size: 16px; font-weight: bold; text-align: center; }
+
+    .option-selector { max-width: 960px; margin: 12px auto; padding: 0 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .opt-btn { min-height: var(--touch-size); border: 2px solid #2a3b4c; background: var(--panel); color: var(--text); border-radius: 8px; font-size: 13px; font-weight: bold; padding: 8px 4px; text-align: center; cursor: pointer; transition: 0.2s; }
+    .opt-btn.active { border-color: var(--accent-light); background: rgba(82, 183, 136, 0.15); color: #fff; box-shadow: 0 0 10px rgba(82, 183, 136, 0.3); }
+
+    .viewport-box { max-width: 960px; margin: 0 auto 16px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #2a3b4c; position: relative; }
+    svg#stage { width: 100%; height: 320px; display: block; touch-action: none; }
+    .hud-overlay { position: absolute; top: 12px; left: 12px; pointer-events: none; font-family: monospace; font-size: 12px; color: var(--accent-light); background: rgba(0,0,0,0.65); padding: 6px 10px; border-radius: 4px; }
+
+    .magazine-container { max-width: 960px; margin: 0 auto; }
+    .sheet { background: #fff; color: #111; width: 100%; max-width: 210mm; min-height: 297mm; padding: 18mm 16mm; margin: 16px auto; box-sizing: border-box; box-shadow: 0 4px 20px rgba(0,0,0,0.4); border-radius: 4px; position: relative; }
+    .sheet-header { border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .sheet-title { font-size: 20px; font-weight: 900; margin: 0; color: #1b4332; text-transform: uppercase; }
+    .sheet-meta { font-size: 10px; color: #666; font-family: monospace; text-align: right; }
+    .editorial-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .article-box { font-size: 12px; line-height: 1.55; color: #333; text-align: justify; }
+    .article-box h4 { margin: 0 0 6px; color: #1b4332; font-size: 13px; border-left: 3px solid #2d6a4f; padding-left: 6px; }
+    
+    table.spec-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+    table.spec-table th, table.spec-table td { border: 1px solid #ccc; padding: 7px 9px; }
+    table.spec-table th { background: #f0f4f1; color: #1b4332; text-align: left; font-weight: bold; }
+
+    .action-dock { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 1px solid #2a3b4c; padding: 12px 16px; display: flex; gap: 10px; justify-content: center; z-index: 200; }
+    .btn-action { height: 46px; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; padding: 0 16px; }
+    .btn-ai { background: var(--gold); color: #000; flex: 1; max-width: 320px; }
+    .btn-print { background: var(--accent); color: #fff; flex: 1; max-width: 200px; }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      header, .controls, .option-selector, .viewport-box, .action-dock { display: none !important; }
+      .sheet { margin: 0; box-shadow: none; page-break-after: always; max-width: 100%; min-height: 100vh; padding: 15mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <span class="badge">BETA 0.4 STABLE</span>
+      <strong style="margin-left: 8px; font-size: 15px;">RIVERBANK CAD & MAGAZINE</strong>
+    </div>
+    <div style="font-size: 12px; color: var(--text-muted);">วิศวกรรมกรรมน้อย พรหมวิหาร 4</div>
+  </header>
+
+  <!-- พารามิเตอร์หน้างาน -->
+  <div class="controls">
+    <div class="control-group">
+      <label>ความยาวแนวตลิ่ง (เมตร)</label>
+      <input type="number" id="inputL" value="30" step="1" oninput="recalc()">
+    </div>
+    <div class="control-group">
+      <label>ความสูงตลิ่งเดิม (เมตร)</label>
+      <input type="number" id="inputH" value="3.5" step="0.1" oninput="recalc()">
+    </div>
+    <div class="control-group">
+      <label>ระดับน้ำหลาก HWL (เมตร)</label>
+      <input type="number" id="inputHWL" value="2.8" step="0.1" oninput="recalc()">
+    </div>
+    <div class="control-group">
+      <label>มุมสโลปหน้าดิน (องศา)</label>
+      <input type="number" id="inputAngle" value="32" step="1" oninput="recalc()">
+    </div>
+  </div>
+
+  <!-- ปุ่มเลือก 3 ออปชัน -->
+  <div class="option-selector">
+    <button class="opt-btn active" id="btnOpt1" onclick="selectTier(1)">ออปชัน 1: แฝกธรรมชาติ<br><small>Eco Vetiver</small></button>
+    <button class="opt-btn" id="btnOpt2" onclick="selectTier(2)">ออปชัน 2: กระสอบ + เข็มยูคา<br><small>Bio-Composite</small></button>
+    <button class="opt-btn" id="btnOpt3" onclick="selectTier(3)">ออปชัน 3: เสาเข็มไอสำเร็จ<br><small>Rigid Precast</small></button>
+  </div>
+
+  <!-- หน้าจอ 3D SVG สำหรับรูดสัมผัสริมตลิ่ง -->
+  <div class="viewport-box">
+    <div class="hud-overlay" id="hudStat">ANGLE: 32° | TIER 1 ACTIVE</div>
+    <svg id="stage" viewBox="0 0 800 320"></svg>
+  </div>
+
+  <!-- นิตยสาร 4 แผ่นพิมพ์ A4 -->
+  <div class="magazine-container">
+
+    <!-- แผ่นที่ 1: ปกและภาพพิมพ์เขียว 3D -->
+    <div class="sheet" id="p1">
+      <div class="sheet-header">
+        <div>
+          <h1 class="sheet-title">THE BIO-ENGINEERING BLUEPRINT</h1>
+          <div style="font-size: 12px; color: #444; margin-top: 3px;">ข้อเสนอโครงการเสริมเสถียรภาพและฟื้นฟูคุ้งน้ำธรรมชาติ</div>
+        </div>
+        <div class="sheet-meta">PAGE 01 / 04<br>REV: B0.4-2026</div>
+      </div>
+      <div style="width: 100%; height: 260px; background: #0b131a; border-radius: 4px; margin-bottom: 16px; overflow: hidden;">
+        <svg id="printStage" viewBox="0 0 800 320" style="width: 100%; height: 100%;"></svg>
+      </div>
+      <div class="editorial-grid">
+        <div class="article-box">
+          <h4>ปรัชญาวิศวกรรมกรรมน้อย (Low-Karma Philosophy)</h4>
+          สายน้ำมีพลังและทิศทางของตนเอง การสร้างโครงสร้างแข็งขวางทางน้ำมักส่งผลกระทบสะท้อนแรงกระแทกไปยังตลิ่งฝั่งตรงข้ามหรือพื้นที่ท้ายน้ำ โครงการนี้ประยุกต์หลักพรหมวิหาร 4 โดยมีเมตตาและกรุณาเป็นที่ตั้ง เลือกใช้วิธีคืนพื้นที่ให้ลำน้ำ ปรับสโลปธรรมชาติ และใช้วัสดุชีวภาพ เพื่อลดภาระค่าใช้จ่ายของเจ้าของโครงการ และไม่สร้างภัยพิบัติต่อสิ่งแวดล้อม
+        </div>
+        <div class="article-box">
+          <h4>ข้อมูลพารามิเตอร์และการประเมินเสถียรภาพ</h4>
+          <table class="spec-table" style="margin: 0;">
+            <tr><td>ความยาวตลิ่งปรับปรุง</td><td id="p1L" style="font-weight: bold;">30.0 ม.</td></tr>
+            <tr><td>ความสูงตลิ่งเดิม (H)</td><td id="p1H" style="font-weight: bold;">3.5 ม.</td></tr>
+            <tr><td>ความชันหน้าดินเฉลี่ย</td><td id="p1Slope" style="font-weight: bold;">1:1.6 (32°)</td></tr>
+            <tr><td>ระดับน้ำท่วมวิกฤต (HWL)</td><td id="p1HWL" style="font-weight: bold;">+2.8 ม. จากท้องน้ำ</td></tr>
+          </table>
+        </div>
+      </div>
+      <div style="border-top: 1px dashed #aaa; padding-top: 8px; font-size: 10px; color: #666; text-align: center;">
+        โครงการนี้ได้รับการคุ้มครองการออกแบบด้วยคณิตศาสตร์เรขาคณิตเวกเตอร์บริสุทธิ์ (Pure White Code Engine)
+      </div>
+    </div>
+
+    <!-- แผ่นที่ 2: สูตรชลศาสตร์และบทความวิชาการประจำออปชัน -->
+    <div class="sheet" id="p2">
+      <div class="sheet-header">
+        <div>
+          <h1 class="sheet-title">ENGINEERING RECIPES & HYDRAULICS</h1>
+          <div style="font-size: 12px; color: #444; margin-top: 3px;">สูตรโครงสร้างชลศาสตร์และการทำงานร่วมกับกระแสน้ำ</div>
+        </div>
+        <div class="sheet-meta">PAGE 02 / 04</div>
+      </div>
+      <div id="recipeDescription" class="article-box" style="margin-bottom: 16px; background: #f8faf8; padding: 12px; border-radius: 4px; border: 1px solid #d8e2dc;"></div>
+      <div class="editorial-grid">
+        <div class="article-box">
+          <h4>กลศาสตร์กระแสน้ำช่วงคุ้งน้ำ (Helicoidal Flow)</h4>
+          บริเวณคุ้งน้ำด้านนอกจะเกิดกระแสน้ำวนขดลวดกัดเซาะลึกที่ตีนตลิ่ง (Toe Scour) ส่งผลให้มวลดินส่วนบนเสียแรงพยุงและสไลด์พังทลายลงมาตามแรงโน้มถ่วง การแก้ไขที่ยั่งยืนจำเป็นต้องล็อกตีนตลิ่งใต้น้ำให้อยู่ตัว ก่อนเสริมความแข็งแรงของลาดดินส่วนบน
+        </div>
+        <div class="article-box">
+          <h4>ระยะเวลาคืนสมดุลแผ่นดิน (Ecological Payback)</h4>
+          <div id="paybackBox" style="font-size: 11.5px; line-height: 1.5; color: #222;"></div>
+        </div>
+      </div>
+      <div style="margin-top: 20px;">
+        <h4 style="color: #1b4332; margin: 0 0 6px;">เปรียบเทียบ 3 ตัวเลือกตามบริบทความคุ้มค่า</h4>
+        <table class="spec-table">
+          <thead>
+            <tr><th>ตัวเลือกโครงสร้าง</th><th>จุดเด่นทางวิศวกรรม</th><th>ระดับความเสี่ยงชลศาสตร์</th><th>ระดับงบประมาณ</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1. Eco Vetiver</td><td>รากแฝกลึก 3 ม. ยึดหน้าดินคืนธรรมชาติ</td><td>เหมาะกับน้ำไหลช้า-ปานกลาง</td><td>ประหยัดสูงสุด</td></tr>
+            <tr><td>2. Bio-Composite</td><td>ระเบียงกระสอบดิน + เข็มยูคาล็อกแนว</td><td>ต้านทานการกัดเซาะคุ้งน้ำได้ดี</td><td>สมเหตุสมผล คุ้มค่า</td></tr>
+            <tr><td>3. Rigid Precast</td><td>เข็มไอคอนกรีต + แผ่นเสียบแข็งแกร่ง</td><td>รับแรงดันดินสูง คุ้งน้ำเชี่ยวจัด</td><td>งบประมาณมาตรฐานสูง</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- แผ่นที่ 3: ตารางราคา BOQ และงวดงานตามความเสี่ยงจริง -->
+    <div class="sheet" id="p3">
+      <div class="sheet-header">
+        <div>
+          <h1 class="sheet-title">BILL OF QUANTITIES & MILESTONES</h1>
+          <div style="font-size: 12px; color: #444; margin-top: 3px;">ประมาณการปริมาณวัสดุและงวดงานตามความเสี่ยงจริง</div>
+        </div>
+        <div class="sheet-meta">PAGE 03 / 04</div>
+      </div>
+      <div style="font-size: 12px; color: #444; margin-bottom: 8px;">
+        <strong>สูตรโครงสร้างที่เลือกใช้งาน:</strong> <span id="boqSelectedTierName">ออปชัน 1</span>
+      </div>
+      <table class="spec-table" id="boqTable">
+        <thead>
+          <tr><th>ลำดับ</th><th>รายการวัสดุและกระบวนการทำงาน</th><th>ปริมาณ</th><th>หน่วย</th><th>ราคา/หน่วย</th><th>รวม (บาท)</th></tr>
+        </thead>
+        <tbody id="boqBody"></tbody>
+        <tfoot>
+          <tr style="background: #f0f4f1; font-weight: bold;">
+            <td colspan="5" style="text-align: right;">ยอดรวมสุทธิโดยประมาณ:</td>
+            <td id="boqTotalSum" style="color: #1b4332; font-size: 14px;">0 ฿</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="margin-top: 24px;">
+        <h4 style="color: #1b4332; margin: 0 0 6px;">การจัดสรรงวดเงินตามความเสี่ยงหน้างาน (Milestone Allocation)</h4>
+        <table class="spec-table">
+          <tr><td>งวดที่ 1 (35%)</td><td>เปิดหน่วยงาน, วางแนวระดับ และดำเนินงานโครงสร้างใต้น้ำ/ตีนตลิ่ง</td><td id="m1" style="font-weight: bold;">0 ฿</td></tr>
+          <tr><td>งวดที่ 2 (35%)</td><td>งานปรับสโลป, วางชั้นคันดิน หรือติดตั้งแผ่นกันดินตามสเปก</td><td id="m2" style="font-weight: bold;">0 ฿</td></tr>
+          <tr><td>งวดที่ 3 (20%)</td><td>งานเสริมเสถียรภาพผิวชีวภาพ ปลูกพืช ปูผ้ากรอง และทางระบายน้ำ</td><td id="m3" style="font-weight: bold;">0 ฿</td></tr>
+          <tr><td>งวดที่ 4 (10%)</td><td>ตรวจการทรุดตัว ตรวจรับงานสมบูรณ์ และส่งมอบพื้นที่</td><td id="m4" style="font-weight: bold;">0 ฿</td></tr>
+        </table>
+      </div>
+      <div style="font-size: 10.5px; color: #777; margin-top: 10px;">
+        * คิดอัตรากำไรและค่าแรงอย่างเป็นธรรมตามต้นทุนจริง (Open-Book Margin) ปราศจากการฉวยโอกาสจากภัยพิบัติ
+      </div>
+    </div>
+
+    <!-- แผ่นที่ 4: ตารางเช็กลิสต์ตรวจรับงาน แนบรูป และสัญญา -->
+    <div class="sheet" id="p4">
+      <div class="sheet-header">
+        <div>
+          <h1 class="sheet-title">QUALITY AUDIT & AGREEMENT</h1>
+          <div style="font-size: 12px; color: #444; margin-top: 3px;">เกณฑ์การตรวจสอบคุณภาพรายขั้นตอน และข้อตกลงร่วมกัน</div>
+        </div>
+        <div class="sheet-meta">PAGE 04 / 04</div>
+      </div>
+      <div style="font-size: 11.5px; margin-bottom: 12px; color: #333;">
+        ตารางเช็กลิสต์นี้ใช้เป็นข้อกำหนดทางวิศวกรรมร่วมกัน เพื่อป้องกันข้อผิดพลาดหน้างาน เจ้าของโครงการสามารถใช้ตรวจสอบการทำงานของช่างในแต่ละขั้นตอนได้อย่างโปร่งใส
+      </div>
+      <table class="spec-table" id="auditTable">
+        <thead>
+          <tr><th style="width: 45px;">ขั้นตอน</th><th>เกณฑ์การตรวจสอบคุณภาพ (Quality Milestone)</th><th style="width: 80px;">สถานะ</th><th style="width: 110px;">ภาพหลักฐาน</th></tr>
+        </thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+      <div class="editorial-grid" style="margin-top: 24px;">
+        <div style="border: 1px solid #ccc; padding: 14px; border-radius: 4px; text-align: center;">
+          <div style="font-size: 11px; color: #666; margin-bottom: 40px;">ลงนาม ผู้ว่าจ้าง / เจ้าของโครงการ</div>
+          <div>(......................................................)</div>
+          <div style="font-size: 10px; color: #888; margin-top: 4px;">วันที่: ...... / ...... / 2026</div>
+        </div>
+        <div style="border: 1px solid #ccc; padding: 14px; border-radius: 4px; text-align: center;">
+          <div style="font-size: 11px; color: #666; margin-bottom: 40px;">ลงนาม ผู้รับเหมา / วิศวกรผู้ดำเนินงาน</div>
+          <div>(......................................................)</div>
+          <div style="font-size: 10px; color: #888; margin-top: 4px;">วันที่: ...... / ...... / 2026</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- เมนูคำสั่งลอยด้านล่างจอ -->
+  <div class="action-dock">
+    <button class="btn-action btn-ai" onclick="copyAIPrompt()">📋 คัดลอก Prompt ถกกับ AI</button>
+    <button class="btn-action btn-print" onclick="window.print()">🖨️ พิมพ์เอกสาร A4</button>
+  </div>
+
+  <script>
+    let currentTier = 1;
+
+    const tiers = {
+      1: {
+        name: "ออปชัน 1: ปรับสโลปธรรมชาติ + หญ้าแฝกยึดผิว (Eco Vetiver)",
+        desc: "เน้นการปรับสโลปตลิ่งให้อยู่ในมุมปลอดภัย (Slope 1:1.6 หรือ 32 องศา) เพื่อให้มวลดินทรงตัวได้ตามธรรมชาติ ร่วมกับการปักชำกล้าหญ้าแฝกสายพันธุ์แท้หนาแน่น โครงข่ายรากแฝกจะถักประสานลึก 2-3 เมตร ป้องกันการพังทลายจากแรงน้ำฝนและกระแสน้ำไหลเอื่อยได้อย่างยอดเยี่ยมและไร้มลพิษ",
+        payback: "• รากแฝกเริ่มยึดดินภายใน: 30 วัน<br>• สมบูรณ์เต็มประสิทธิภาพ: 90 วัน<br>• ผลกระทบต่อท้ายน้ำ: 0% (เป็นมิตรแท้)",
+        items: [
+          { name: "งานขุดปรับแต่งสโลปเปิดหน้าดินธรรมชาติ (Slope 1:1.6)", rate: 180, unit: "ลบ.ม.", calc: (L, H) => L * H * 1.2 },
+          { name: "กล้าหญ้าแฝกคัดพันธุ์รากยาวพิเศษ พร้อมปลูกชิด 10 ซม.", rate: 4.5, unit: "ต้น", calc: (L, H) => L * 10 * 4 },
+          { name: "งานปักชำ รดน้ำ และบำรุงรักษาหน้าดิน 60 วัน", rate: 120, unit: "เมตร", calc: (L) => L }
+        ],
+        audit: [
+          "ปรับแต่งความลาดเอียงสม่ำเสมอ ความชันไม่เกิน 1:1.5 ปราศจากโพรงใต้ดิน",
+          "ขุดร่องปลูกขนานแนวระดับน้ำลึก 15-20 ซม. พร้อมรองก้นหลุม",
+          "ปักชำกล้าแฝกสมบูรณ์ ระยะห่างไม่เกิน 10-12 ซม. แน่นหนาทุกจุด",
+          "รดน้ำชุ่มชื้นรอบแรกภายในวัน และตรวจการระบายน้ำผิวดิน"
+        ]
+      },
+      2: {
+        name: "ออปชัน 2: กระสอบ Geotextile + ล็อกเสาเข็มไม้ยูคา (Bio-Composite)",
+        desc: "โครงสร้างแบบกึ่งยืดหยุ่น (Flexible Stepped Revetment) เรียงกระสอบดินห่อผ้าสังเคราะห์ทนทานสูงเป็นชั้นบันได ล็อกตีนตลิ่งด้วยเสาเข็มไม้ยูคาคัดสด ไม้ที่จมน้ำตลอดเวลาจะไม่ผุกร่อน ชั้นกระสอบยอมให้น้ำซึมผ่านแต่กักเม็ดดินไว้ 100% เหมาะสำหรับโค้งคุ้งน้ำที่มีแรงเซาะปานกลาง",
+        payback: "• ล็อกการกัดเซาะทันที: 100% ตั้งแต่วันแรก<br>• บรรลุสมดุลคืนสู่ธรรมชาติ: 180 วัน<br>• ปรับเปลี่ยนและซ่อมแซมเฉพาะจุดได้ง่าย",
+        items: [
+          { name: "เสาเข็มไม้ยูคาลิปตัสสด เส้นผ่านศูนย์กลาง 4-5 นิ้ว ยาว 3.0 ม.", rate: 160, unit: "ต้น", calc: (L) => L * 2 },
+          { name: "งานตอกเข็มไม้ยูคาล็อกแนวตีนตลิ่งใต้น้ำ", rate: 90, unit: "ต้น", calc: (L) => L * 2 },
+          { name: "ผ้ากรองปฐพีสังเคราะห์ทนทาน (Non-woven Geotextile)", rate: 65, unit: "ตร.ม.", calc: (L, H) => L * (H + 1.5) },
+          { name: "กระสอบดินสังเคราะห์บรรจุดินแน่น เรียงระเบียงขั้นบันได", rate: 85, unit: "ใบ", calc: (L, H) => L * 3 * 3 },
+          { name: "กล้าหญ้าแฝกแทรกตามแนวกระสอบล็อกผิว", rate: 4.5, unit: "ต้น", calc: (L) => L * 15 }
+        ],
+        audit: [
+          "ตอกเข็มยูคาลิปตัสตีนตลิ่งลึกจมดินเดิม ระยะพิทช์ไม่เกิน 50 ซม.",
+          "ปูแผ่นกรอง Geotextile ใต้น้ำ มีระยะทับซ้อน (Overlap) ไม่น้อยกว่า 30 ซม.",
+          "เรียงชั้นกระสอบสลับหว่าง แนบชิดแนวเข็มและบดอัดดินหลังกระสอบเป็นชั้น",
+          "ปลูกแฝกเสริมรอยต่อระหว่างกระสอบและตรวจสอบการซึมผ่านของน้ำ"
+        ]
+      },
+      3: {
+        name: "ออปชัน 3: กำแพงเสาเข็มคอนกรีตไอ + แผ่นเสียบ (Rigid Precast)",
+        desc: "โครงสร้างกันดินชนิดแข็งแกร่งถาวร (Rigid Retaining Wall) ตอกเสาเข็มคอนกรีตรูปตัวไอพร้อมหย่อนแผ่นเสียบคอนกรีตสำเร็จรูปลึกใต้ท้องน้ำ รองรับแรงดันดินด้านข้างได้สูง เหมาะสำหรับริมตลิ่งที่มีสิ่งปลูกสร้างชิดแนว หรือจุดปะทะคุ้งน้ำแรงจัด",
+        payback: "• ป้องกันการพังทลายสมบูรณ์: 100% ทันที<br>• อายุการใช้งานโครงสร้างคอนกรีต: 25-30 ปี<br>• ต้องมีระบบระบายน้ำหลังกำแพงที่สมบูรณ์",
+        items: [
+          { name: "เสาเข็มคอนกรีตอัดแรงรูปตัวไอ (I-Beam) ยาว 6.0 ม.", rate: 1250, unit: "ต้น", calc: (L) => Math.ceil(L / 1.5) + 1 },
+          { name: "ค่าปั้นจั่นตอกเสาเข็มคอนกรีตแนวลำน้ำ", rate: 600, unit: "ต้น", calc: (L) => Math.ceil(L / 1.5) + 1 },
+          { name: "แผ่นเสียบคอนกรีตกันดินสำเร็จรูปหนา 7 ซม.", rate: 450, unit: "แผ่น", calc: (L, H) => Math.ceil(L / 1.5) * Math.ceil(H / 0.35) },
+          { name: "งานเทคอนกรีตคานรัดหัวเสา (Capping Beam) เสริมเหล็ก", rate: 1100, unit: "เมตร", calc: (L) => L },
+          { name: "ระบบท่อระบายน้ำลดแรงดันน้ำ (Weep Holes) พร้อมกรวดกรอง", rate: 250, unit: "จุด", calc: (L) => Math.ceil(L / 2) }
+        ],
+        audit: [
+          "ตอกเสาเข็มไอได้แนวดิ่ง 90 องศา ระยะช่องว่างตรงขนาดแผ่นเสียบ",
+          "หย่อนแผ่นเสียบประกบสนิท แผ่นล่างสุดจมลึกพ้นระดับการกัดเซาะท้องน้ำ",
+          "เจาะช่องระบายน้ำ Weep Hole ห่อตาข่ายกรองตะกอนป้องกันดินอุดตัน",
+          "เทคานรัดหัวเสาเสริมเหล็กต่อเนื่องตลอดแนว และถมดินหลังกำแพงเป็นชั้น"
+        ]
+      }
+    };
+
+    function selectTier(t) {
+      currentTier = t;
+      document.querySelectorAll('.opt-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === t));
+      recalc();
+    }
+
+    function render3D(svgId, L, H, angle, tier) {
+      const svg = document.getElementById(svgId);
+      if (!svg) return;
+      
+      let content = `
+        <defs>
+          <linearGradient id="skyGrad_${svgId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0a1118"/>
+            <stop offset="100%" stop-color="#162330"/>
+          </linearGradient>
+          <linearGradient id="waterGrad_${svgId}" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="rgba(33, 150, 243, 0.45)"/>
+            <stop offset="100%" stop-color="rgba(3, 169, 244, 0.65)"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="320" fill="url(#skyGrad_${svgId})"/>
+        
+        <!-- ชั้นดินเดิม -->
+        <polygon points="0,320 0,60 260,60 620,280 800,280 800,320" fill="#2d2218" opacity="0.95"/>
+        <polygon points="260,60 620,280 620,320 260,320" fill="#423425"/>
+      `;
+
+      if (tier === 1) {
+        content += `
+          <line x1="260" y1="60" x2="620" y2="280" stroke="#52b788" stroke-width="8" stroke-linecap="round"/>
+          <g stroke="#74c69d" stroke-width="2" stroke-dasharray="4 3">
+            <line x1="320" y1="95" x2="335" y2="155"/>
+            <line x1="400" y1="145" x2="415" y2="205"/>
+            <line x1="480" y1="195" x2="495" y2="255"/>
+            <line x1="560" y1="245" x2="575" y2="305"/>
+          </g>
+          <text x="360" y="85" fill="#52b788" font-size="12" font-family="monospace">VETIVER BIO-ARMOR (ROOTS 3.0m)</text>
+        `;
+      } else if (tier === 2) {
+        content += `
+          <rect x="580" y="220" width="12" height="95" fill="#8d6e63" stroke="#5d4037" stroke-width="2"/>
+          <rect x="605" y="225" width="12" height="90" fill="#8d6e63" stroke="#5d4037" stroke-width="2"/>
+          <g fill="#78909c" stroke="#37474f" stroke-width="1.5">
+            <rect x="530" y="250" width="60" height="25" rx="3"/>
+            <rect x="470" y="220" width="65" height="25" rx="3"/>
+            <rect x="410" y="190" width="65" height="25" rx="3"/>
+            <rect x="350" y="160" width="65" height="25" rx="3"/>
+          </g>
+          <text x="420" y="150" fill="#90caf9" font-size="12" font-family="monospace">STEPPED GEOBAGS + TIMBER TOE</text>
+        `;
+      } else {
+        content += `
+          <rect x="520" y="100" width="18" height="215" fill="#b0bec5" stroke="#455a64" stroke-width="2"/>
+          <rect x="538" y="120" width="8" height="195" fill="#78909c"/>
+          <rect x="510" y="120" width="10" height="160" fill="#cfd8dc" stroke="#607d8b"/>
+          <rect x="505" y="100" width="40" height="20" fill="#90a4ae" stroke="#37474f" stroke-width="2"/>
+          <text x="410" y="95" fill="#eceff1" font-size="12" font-family="monospace">PRECAST I-BEAM RIGID WALL</text>
+        `;
+      }
+
+      content += `
+        <polygon points="460,230 800,230 800,320 460,320" fill="url(#waterGrad_${svgId})"/>
+        <line x1="460" y1="230" x2="800" y2="230" stroke="#00e5ff" stroke-width="2" stroke-dasharray="6 3"/>
+        <text x="680" y="220" fill="#00e5ff" font-size="11" font-family="monospace">HWL +2.80m</text>
+      `;
+
+      svg.innerHTML = content;
+    }
+
+    function recalc() {
+      const L = parseFloat(document.getElementById('inputL').value) || 30;
+      const H = parseFloat(document.getElementById('inputH').value) || 3.5;
+      const HWL = parseFloat(document.getElementById('inputHWL').value) || 2.8;
+      const angle = parseFloat(document.getElementById('inputAngle').value) || 32;
+
+      document.getElementById('hudStat').innerText = `LENGTH: ${L}m | HEIGHT: ${H}m | ANGLE: ${angle}° | OPTION ${currentTier}`;
+
+      render3D('stage', L, H, angle, currentTier);
+      render3D('printStage', L, H, angle, currentTier);
+
+      document.getElementById('p1L').innerText = `${L.toFixed(1)} ม.`;
+      document.getElementById('p1H').innerText = `${H.toFixed(1)} ม.`;
+      document.getElementById('p1Slope').innerText = `1:${(1 / Math.tan(angle * Math.PI / 180)).toFixed(1)} (${angle}°)`;
+      document.getElementById('p1HWL').innerText = `+${HWL.toFixed(1)} ม. จากท้องน้ำ`;
+
+      const data = tiers[currentTier];
+      document.getElementById('recipeDescription').innerHTML = `
+        <h4 style="margin-top:0;">แนวคิดการทำงาน: ${data.name}</h4>
+        <p style="margin:0;">${data.desc}</p>
+      `;
+      document.getElementById('paybackBox').innerHTML = data.payback;
+
+      document.getElementById('boqSelectedTierName').innerText = data.name;
+      let total = 0;
+      let html = '';
+
+      data.items.forEach((item, idx) => {
+        const qty = Math.round(item.calc(L, H));
+        const sum = qty * item.rate;
+        total += sum;
+        html += `
+          <tr>
+            <td>${String(idx + 1).padStart(2, '0')}</td>
+            <td>${item.name}</td>
+            <td style="text-align:right;">${qty.toLocaleString()}</td>
+            <td>${item.unit}</td>
+            <td style="text-align:right;">${item.rate.toLocaleString()}</td>
+            <td style="text-align:right; font-weight:bold;">${sum.toLocaleString()} ฿</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById('boqBody').innerHTML = html;
+      document.getElementById('boqTotalSum').innerText = `${total.toLocaleString()} บาท`;
+
+      document.getElementById('m1').innerText = `${Math.round(total * 0.35).toLocaleString()} ฿`;
+      document.getElementById('m2').innerText = `${Math.round(total * 0.35).toLocaleString()} ฿`;
+      document.getElementById('m3').innerText = `${Math.round(total * 0.20).toLocaleString()} ฿`;
+      document.getElementById('m4').innerText = `${Math.round(total * 0.10).toLocaleString()} ฿`;
+
+      let auditHtml = '';
+      data.audit.forEach((step, idx) => {
+        auditHtml += `
+          <tr>
+            <td style="font-weight:bold; text-align:center;">${String(idx + 1).padStart(2, '0')}</td>
+            <td>${step}</td>
+            <td style="text-align:center;"><input type="checkbox" style="width:18px; height:18px;"></td>
+            <td style="text-align:center;">
+              <label style="font-size:10px; background:#eee; padding:3px 6px; border-radius:3px; cursor:pointer;">
+                📷 แนบรูป
+                <input type="file" accept="image/*" style="display:none;" onchange="attachPhoto(this)">
+              </label>
+            </td>
+          </tr>
+        `;
+      });
+      document.getElementById('auditBody').innerHTML = auditHtml;
+    }
+
+    function attachPhoto(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const td = input.parentElement.parentElement;
+          td.innerHTML = `<img src="${e.target.result}" style="width:65px; height:45px; object-fit:cover; border-radius:3px; border:1px solid #999;">`;
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function copyAIPrompt() {
+      const L = document.getElementById('inputL').value;
+      const H = document.getElementById('inputH').value;
+      const angle = document.getElementById('inputAngle').value;
+      const tierName = tiers[currentTier].name;
+      const total = document.getElementById('boqTotalSum').innerText;
+
+      const promptText = `[ข้อปรึกษาวิศวกรรมชลศาสตร์และชีววิศวกรรมกรรมน้อย - Beta 0.4]
+หน้างานปัจจุบัน: ลำน้ำธรรมชาติ ความยาวตลิ่ง ${L} ม. ความสูงตลิ่ง ${H} ม. มุมสโลป ${angle} องศา
+ทางเลือกที่สนใจ: ${tierName} (ยอดประมาณการเบื้องต้น ${total})
+
+ช่วยระดมสมองและตรวจสอบความเสี่ยง:
+1. วิเคราะห์สภาพหน้างานจากรูปถ่ายคุ้งน้ำ มีความเสี่ยงต่อการหลุดลอยของมวลดินตีนตลิ่งหรือไม่?
+2. ช่วยปรับสูตรวัสดุให้ต้นทุนประหยัดลงแต่คงความปลอดภัยตามหลักชลศาสตร์
+3. แนะนำเกณฑ์ตรวจรับงานเพิ่มเติมเพื่อความมั่นใจของเจ้าของโครงการ`;
+
+      navigator.clipboard.writeText(promptText).then(() => {
+        alert("📋 คัดลอก Prompt สำหรับคุยกับ AI สำเร็จ!\nนำไปวางคุยกับ AI พร้อมแนบรูปหน้างานได้ทันที");
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', recalc);
+  </script>
+</body>
+</html>
